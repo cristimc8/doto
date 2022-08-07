@@ -1,12 +1,7 @@
-#ifndef HEADER_DOTO-DB-CONNECTOR
-#define HEADER_DOTO-DB-CONNECTOR
+#ifndef HEADER_DOTO_DB_CONNECTOR
+#define HEADER_DOTO_DB_CONNECTOR
 
-enum PURPOSE {
-    DISPLAY = 0,
-    SAVE_TASK = 1,
-	SAVE_PROJECT = 2,
-	INVALID = 3
-};
+#include "doto-db-globals.h"
 
 /**
   * Opens the db
