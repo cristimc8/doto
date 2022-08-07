@@ -11,21 +11,23 @@ char* errMsg = 0;
 int execStatus;
 
 int main(int argc, char* argv[]) {
-	PURPOSE connectorPurpose = getConnectorPurpose(argv);
+	PURPOSE connectorPurpose = getConnectorPurpose(argc, argv);
 	int code = 0;
 
 	if(openDb() != 0) {
 		return 1;
 	}
 
+	printf("it is: %d\n", connectorPurpose);
+
 	switch(connectorPurpose) {
-		case PURPOSE.DISPLAY:
+		case DISPLAY:
 			code = displayForArgs(argc, argv);
 			break;
-		case PURPOSE.SAVE_TASK:
+		case SAVE_TASK:
 			code = saveTaskForArgs(argc, argv);
 			break;
-		case PURPOSE.SAVE_PROJECT:
+		case SAVE_PROJECT:
 			code = saveProject(argv[2]);
 			break;
 		default:
@@ -59,56 +61,22 @@ int saveTaskForArgs(int argc, char* argv[]) {
 }
 
 int displayForArgs(int argc, char* argv[]) {
+	int pid = -1;
+	if(argc == 3) {
+		pid = getProjectIdByName(argv[2]);
+	}
+
 	const char* sql = argc == 2 ?
 		"SELECT * FROM tasks\
 		WHERE project_id is null"
 		:
-		"SELECT * FROM tasks"; // todo
-}
+		"SELECT * FROM tasks\
+		WHERE project_id = @pid";
 
-PURPOSE getConnectorPurpose(int argc, char* argv[]) {
-	switch(argv[1]) {
-		case "display": 
-			return PURPOSE.DISPLAY;
-		case "saveTask":
-			return PURPOSE.SAVE_TASK;
-		case "saveProject":
-			return PURPOSE.SAVE_PROJECT;
-		default:
-			return PURPOSE.INVALID;
-	}
-}
-
-int saveProject(char* project) {
-	const char* sql = "INSERT INTO projects(project)"
-						"VALUES(@projectName)";
 	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
 	if(execStatus == SQLITE_OK) {
-		int idx = sqlite3_bind_parameter_index(res, "@projectName");
-		sqlite3_bind_text(res, idx, project, strlen(project), NULL);
-	
-		execStatus = sqlite3_step(res);
-		if(execStatus != SQLITE_DONE) {
-			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
-		}
-	 	else {
-			fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
-			sqlite3_finalize(res);
-			return 1; 
-		}
-	}
-	sqlite3_finalize(res);
-	return 0;
-}
-
-int getProjectIdByName(char* project) {
-	int pid = -1;
-	const char* sql = "SELECT p.id FROM"
-						"projects p WHERE p.project = @project";
-	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
-	if(execStatus == SQLITE_OK) {
-		int idx = sqlite3_bind_parameter_index(res, "@project");
-		sqlite3_bind_text(res, idx, project, strlen(project), NULL);
+		int idx = sqlite3_bind_parameter_index(res, "@pid");
+		sqlite3_bind_int(res, idx, pid);
 	
 		int step = sqlite3_step(res);
 		if(step == SQLITE_ROW) {
@@ -124,14 +92,75 @@ int getProjectIdByName(char* project) {
 
 	sqlite3_finalize(res);
 	return pid;
+
+}
+
+PURPOSE getConnectorPurpose(int argc, char* argv[]) {
+
+	if(strcmp(argv[1], "display") == 0) {
+		return DISPLAY;
+	}
+	else if(strcmp(argv[1], "saveTask") == 0) {
+		return SAVE_TASK;
+	}
+	else if(strcmp(argv[1], "saveProject") == 0) {
+		return SAVE_PROJECT;
+	}
+	return INVALID;
+}
+
+int saveProject(char* project) {
+	const char* sql = "INSERT INTO projects(project)"
+						"VALUES(@projectName)";
+	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
+	if(execStatus == SQLITE_OK) {
+		int idx = sqlite3_bind_parameter_index(res, "@projectName");
+		sqlite3_bind_text(res, idx, project, strlen(project), NULL);
+	
+		execStatus = sqlite3_step(res);
+		if(execStatus != SQLITE_DONE) {
+			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+		}
+	} else {
+		fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
+		sqlite3_finalize(res);
+		return 1; 
+	}
+	sqlite3_finalize(res);
+	return 0;
+}
+
+int getProjectIdByName(char* project) {
+	int pid = -1;
+	const char* sql = "SELECT id FROM "
+						"projects WHERE project = @project";
+	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
+	if(execStatus == SQLITE_OK) {
+		int idx = sqlite3_bind_parameter_index(res, "@project");
+		sqlite3_bind_text(res, idx, project, strlen(project), NULL);
+	
+		int step = sqlite3_step(res);
+		if(step == SQLITE_ROW) {
+			pid = sqlite3_column_int(res, 0);	
+		}
+		execStatus = sqlite3_step(res);
+		if(execStatus != SQLITE_DONE) {
+			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+		} 
+	} else {
+		fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
+	}
+
+	sqlite3_finalize(res);
+	return pid;
 }
 
 void saveTask(char* task, int pid) {
 	const char* sql = pid == -1 ? 
-		"INSERT INTO t.tasks(task)\
+		"INSERT INTO tasks(task)\
 		VALUES (@task)"
 		:
-		"INSERT INTO t.tasks(task, project_id)\
+		"INSERT INTO tasks(task, project_id)\
 		VALUES (@task, @pid)";
 	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
 	if(execStatus == SQLITE_OK) {
