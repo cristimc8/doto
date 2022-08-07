@@ -7,7 +7,7 @@
   * Opens the db
   * returns -1 if anything does not work
   */
-int openDb();
+int openDb(char*);
 /**
   * Returns the project's id from the provided name
   * or -1 if the project is not found.

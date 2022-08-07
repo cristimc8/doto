@@ -10,15 +10,34 @@ sqlite3_stmt *res;
 char* errMsg = 0;
 int execStatus;
 
+char *removeEnd(char *str, char c)
+{
+   char *last_pos = strrchr(str, c);
+
+   if (last_pos != NULL) {
+      *last_pos = '\0';
+      return last_pos + 1; /* pointer to the removed part of the string */
+   }
+
+   return NULL;  /* c wasn't found in the string */
+}
+
+void createDbName(char* dbPath, char *argv[]) {
+	strcpy(dbPath, argv[0]);
+	removeEnd(dbPath, '/');
+	strcat(strcat(dbPath, "/"), dbName);
+}
+
 int main(int argc, char* argv[]) {
+	char* dbPath = (char*) malloc(strlen(argv[0]) + strlen(dbName) + 2);
+	createDbName(dbPath, argv);
+
 	PURPOSE connectorPurpose = getConnectorPurpose(argc, argv);
 	int code = 0;
 
-	if(openDb() != 0) {
+	if(openDb(dbPath) != 0) {
 		return 1;
 	}
-
-	printf("it is: %d\n", connectorPurpose);
 
 	switch(connectorPurpose) {
 		case DISPLAY:
@@ -30,6 +49,10 @@ int main(int argc, char* argv[]) {
 		case SAVE_PROJECT:
 			code = saveProject(argv[2]);
 			break;
+		case CHECK_PROJECT:
+			fprintf(stdout, "%d", getProjectIdByName(argv[2]));
+			code = 0;
+			break;
 		default:
 			fprintf(stderr, "Invalid purpose detected\n");
 			return 1;
@@ -38,13 +61,15 @@ int main(int argc, char* argv[]) {
 	return code;
 }
 
-int openDb() {
-	if((execStatus = sqlite3_open(dbName, &dbHandle)) != SQLITE_OK) {
+int openDb(char* dbPath) {
+	if((execStatus = sqlite3_open(dbPath, &dbHandle)) != SQLITE_OK) {
 		fprintf(stderr, "An error occured: %s\n", sqlite3_errmsg(dbHandle));
 		sqlite3_close(dbHandle);
-
+		
+		free(dbPath);
 		return 1;
 	}
+	free(dbPath);
 	return 0;
 }
 
@@ -106,6 +131,9 @@ PURPOSE getConnectorPurpose(int argc, char* argv[]) {
 	else if(strcmp(argv[1], "saveProject") == 0) {
 		return SAVE_PROJECT;
 	}
+	else if(strcmp(argv[1], "checkProject") == 0) {
+		return CHECK_PROJECT;
+	}
 	return INVALID;
 }
 
@@ -157,10 +185,10 @@ int getProjectIdByName(char* project) {
 
 void saveTask(char* task, int pid) {
 	const char* sql = pid == -1 ? 
-		"INSERT INTO tasks(task)\
+		"INSERT INTO tasks(task) \
 		VALUES (@task)"
 		:
-		"INSERT INTO tasks(task, project_id)\
+		"INSERT INTO tasks(task, project_id) \
 		VALUES (@task, @pid)";
 	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
 	if(execStatus == SQLITE_OK) {
