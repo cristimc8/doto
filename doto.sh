@@ -18,11 +18,19 @@ CONNECTOR="$__CONNECTOR_PATH"
 
 . "$DIR/doto-flags.sh" "$@"
 
+if [ ! $DISPLAY -eq "0" ]; then
+	if [ ! -z "$PROJECT" ]; then
+		echo "$($CONNECTOR "display" "$PROJECT")"
+	else
+		echo "$($CONNECTOR "display")"
+	fi
+	exit 0
+fi
 
 read -p "Task: " TASK
 
 # If a project was provided
-if [ ! -z $PROJECT ]; then
+if [ ! -z "$PROJECT" ]; then
 
 	# Check if project exists
 	PROJECT_EXISTS=$($CONNECTOR "checkProject" "$PROJECT")
