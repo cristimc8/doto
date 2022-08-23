@@ -19,7 +19,7 @@ char *removeEnd(char *str, char c)
       return last_pos + 1; /* pointer to the removed part of the string */
    }
 
-   return NULL;  /* c wasn't found in the string */
+   return NULL;  
 }
 
 void createDbName(char* dbPath, char *argv[]) {
@@ -92,25 +92,27 @@ int displayForArgs(int argc, char* argv[]) {
 	}
 
 	const char* sql = argc == 2 ?
-		"SELECT * FROM tasks\
+		"SELECT task FROM tasks\
 		WHERE project_id is null"
 		:
-		"SELECT * FROM tasks\
+		"SELECT task FROM tasks\
 		WHERE project_id = @pid";
 
 	execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
 	if(execStatus == SQLITE_OK) {
-		int idx = sqlite3_bind_parameter_index(res, "@pid");
-		sqlite3_bind_int(res, idx, pid);
-	
-		int step = sqlite3_step(res);
-		if(step == SQLITE_ROW) {
-			pid = sqlite3_column_int(res, 0);	
+		if(pid != -1) {
+			int idx = sqlite3_bind_parameter_index(res, "@pid");
+			sqlite3_bind_int(res, idx, pid);
 		}
-	}
-	execStatus = sqlite3_step(res);
-	if(execStatus != SQLITE_DONE) {
-		printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+		int step = sqlite3_step(res);
+		while(step == SQLITE_ROW) {
+			printf("%s\n", sqlite3_column_text(res, 0));
+			step = sqlite3_step(res);
+		}
+		execStatus = sqlite3_step(res);
+		if(execStatus != SQLITE_DONE && execStatus != SQLITE_ROW) {
+			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+		} 
 	} else {
 		fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
 	}
