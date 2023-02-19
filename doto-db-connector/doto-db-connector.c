@@ -19,7 +19,7 @@ char *removeEnd(char *str, char c)
       return last_pos + 1; /* pointer to the removed part of the string */
    }
 
-   return NULL;  
+   return NULL;
 }
 
 void createDbName(char* dbPath, char *argv[]) {
@@ -53,10 +53,16 @@ int main(int argc, char* argv[]) {
 			fprintf(stdout, "%d", getProjectIdByName(argv[2]));
 			code = 0;
 			break;
+        case LIST_PROJECTS:
+            code = listProjects();
+            break;
+        case DELETE_PROJECT:
+            code = deleteProject(argv[2]);
+            break;
 		default:
 			fprintf(stderr, "Invalid purpose detected\n");
 			return 1;
-	}	
+	}
 	sqlite3_close(dbHandle);
 	return code;
 }
@@ -65,7 +71,7 @@ int openDb(char* dbPath) {
 	if((execStatus = sqlite3_open(dbPath, &dbHandle)) != SQLITE_OK) {
 		fprintf(stderr, "An error occured: %s\n", sqlite3_errmsg(dbHandle));
 		sqlite3_close(dbHandle);
-		
+
 		free(dbPath);
 		return 1;
 	}
@@ -112,7 +118,7 @@ int displayForArgs(int argc, char* argv[]) {
 		execStatus = sqlite3_step(res);
 		if(execStatus != SQLITE_DONE && execStatus != SQLITE_ROW) {
 			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
-		} 
+		}
 	} else {
 		fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
 	}
@@ -136,6 +142,12 @@ PURPOSE getConnectorPurpose(int argc, char* argv[]) {
 	else if(strcmp(argv[1], "checkProject") == 0) {
 		return CHECK_PROJECT;
 	}
+	else if(strcmp(argv[1], "listProjects") == 0) {
+        return LIST_PROJECTS;
+    }
+    else if(strcmp(argv[1], "deleteProject") == 0) {
+        return DELETE_PROJECT;
+    }
 	return INVALID;
 }
 
@@ -146,7 +158,7 @@ int saveProject(char* project) {
 	if(execStatus == SQLITE_OK) {
 		int idx = sqlite3_bind_parameter_index(res, "@projectName");
 		sqlite3_bind_text(res, idx, project, strlen(project), NULL);
-	
+
 		execStatus = sqlite3_step(res);
 		if(execStatus != SQLITE_DONE) {
 			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
@@ -154,7 +166,7 @@ int saveProject(char* project) {
 	} else {
 		fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
 		sqlite3_finalize(res);
-		return 1; 
+		return 1;
 	}
 	sqlite3_finalize(res);
 	return 0;
@@ -168,15 +180,15 @@ int getProjectIdByName(char* project) {
 	if(execStatus == SQLITE_OK) {
 		int idx = sqlite3_bind_parameter_index(res, "@project");
 		sqlite3_bind_text(res, idx, project, strlen(project), NULL);
-	
+
 		int step = sqlite3_step(res);
 		if(step == SQLITE_ROW) {
-			pid = sqlite3_column_int(res, 0);	
+			pid = sqlite3_column_int(res, 0);
 		}
 		execStatus = sqlite3_step(res);
 		if(execStatus != SQLITE_DONE) {
 			printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
-		} 
+		}
 	} else {
 		fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
 	}
@@ -186,7 +198,7 @@ int getProjectIdByName(char* project) {
 }
 
 void saveTask(char* task, int pid) {
-	const char* sql = pid == -1 ? 
+	const char* sql = pid == -1 ?
 		"INSERT INTO tasks(task) \
 		VALUES (@task)"
 		:
@@ -210,3 +222,65 @@ void saveTask(char* task, int pid) {
 	sqlite3_finalize(res);
 }
 
+int listProjects() {
+    const char* sql = "SELECT project FROM projects";
+    execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
+    if(execStatus == SQLITE_OK) {
+        int step = sqlite3_step(res);
+        while(step == SQLITE_ROW) {
+            printf("%s\n", sqlite3_column_text(res, 0));
+            step = sqlite3_step(res);
+        }
+        execStatus = sqlite3_step(res);
+        if(execStatus != SQLITE_DONE && execStatus != SQLITE_ROW) {
+            printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+        }
+    } else {
+        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
+    }
+
+    sqlite3_finalize(res);
+    return 0;
+}
+
+int deleteProject(char* project) {
+    // get project id by name
+    int pid = getProjectIdByName(project);
+    deleteTasksForProject(pid);
+
+    const char* sql = "DELETE FROM projects WHERE id = @pid";
+    execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
+    if(execStatus == SQLITE_OK) {
+        int idx = sqlite3_bind_parameter_index(res, "@pid");
+        sqlite3_bind_int(res, idx, pid);
+
+        execStatus = sqlite3_step(res);
+        if(execStatus != SQLITE_DONE) {
+            printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+        }
+    } else {
+        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
+        sqlite3_finalize(res);
+        return 1;
+    }
+}
+
+int deleteTasksForProject(int pid) {
+    const char* sql = "DELETE FROM tasks WHERE project_id = @pid";
+    execStatus = sqlite3_prepare_v2(dbHandle, sql, -1, &res, 0);
+    if(execStatus == SQLITE_OK) {
+        int idx = sqlite3_bind_parameter_index(res, "@pid");
+        sqlite3_bind_int(res, idx, pid);
+
+        execStatus = sqlite3_step(res);
+        if(execStatus != SQLITE_DONE) {
+            printf("%d \"%s\"\n", execStatus, sqlite3_errmsg(dbHandle));
+        }
+    } else {
+        fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(dbHandle));
+        sqlite3_finalize(res);
+        return 1;
+    }
+    sqlite3_finalize(res);
+    return 0;
+}
