@@ -40,5 +40,16 @@ int displayForArgs(int, char*[]);
   * ./doto-db-connector save {task} +-{project}
   */
 int saveTaskForArgs(int, char*[]);
-
+/**
+  * Lists all the projects in the database.
+  */
+int listProjects();
+/**
+  * Deletes a project from the database.
+  */
+int deleteProject(char*);
+/**
+  * Delete all tasks under project with pid.
+  */
+int deleteTasksForProject(int);
 #endif

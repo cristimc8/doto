@@ -9,8 +9,8 @@ fi
 
 DIR="${BASH_SOURCE%/*}"
 
-if [[ ! -d "$DIR" ]]; then 
-	DIR="$PWD" 
+if [[ ! -d "$DIR" ]]; then
+	DIR="$PWD"
 fi
 
 __CONNECTOR_PATH="$DIR/doto-db-connector/doto-db-connector"
@@ -27,6 +27,17 @@ if [ ! $DISPLAY -eq "0" ]; then
 	exit 0
 fi
 
+if [ ! $LIST_PROJECTS -eq "0" ]; then
+    echo "$($CONNECTOR "listProjects")"
+    exit 0
+fi
+
+if [ ! -z "$DELETE_PROJECT" ]; then
+    $($CONNECTOR "deleteProject" "$PROJECT")
+    echo "The project $PROJECT was deleted with success!"
+    exit 0
+fi
+
 read -p "Task: " TASK
 
 # If a project was provided
@@ -34,7 +45,7 @@ if [ ! -z "$PROJECT" ]; then
 
 	# Check if project exists
 	PROJECT_EXISTS=$($CONNECTOR "checkProject" "$PROJECT")
-	# If project does not exist 
+	# If project does not exist
 	if [[ $PROJECT_EXISTS -eq -1 ]]; then
 		read -n1 -p "It seems like the project $PROJECT does not exist. Would you like creating it? (y/n) " CREATE_PROJECT
 
