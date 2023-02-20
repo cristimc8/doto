@@ -32,7 +32,7 @@ if [ ! $LIST_PROJECTS -eq "0" ]; then
     exit 0
 fi
 
-if [ ! -z "$DELETE_PROJECT" ]; then
+if [ ! "$DELETE_PROJECT" -eq "0" ]; then
     $($CONNECTOR "deleteProject" "$PROJECT")
     echo "The project $PROJECT was deleted with success!"
     exit 0
